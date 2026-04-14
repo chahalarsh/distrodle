@@ -18,7 +18,8 @@ const gameState = {
     wasGuessed: false,
     guessCount: 0,
     missCount: 0,
-    revealedHints: []
+    revealedHints: [],
+    discoveredFields: []
 };
 
 // Get all distro names for autocomplete
@@ -45,6 +46,7 @@ app.get('/api/target', (req, res) => {
     gameState.guessCount = 0;
     gameState.missCount = 0;
     gameState.revealedHints = [];
+    gameState.discoveredFields = [];
     
     res.json({
         id: randomDistro.id,
@@ -80,6 +82,11 @@ app.post('/api/guess', (req, res) => {
     
     // Compare attributes and generate feedback
     const feedback = compareDistros(guess, target);
+
+    // Persist what the player has already learned this round.
+    const hintFields = ['paid', 'initSystem', 'releaseType', 'parentDistro', 'packageManager', 'difficulty', 'yearReleased', 'desktopEnvironment', 'basedOn', 'architecture', 'category'];
+    const newlyDiscovered = hintFields.filter(f => feedback[f] && feedback[f].status === 'correct');
+    gameState.discoveredFields = [...new Set([...gameState.discoveredFields, ...newlyDiscovered])];
     
     // Update game state if correct
     const isCorrect = guess.id === target.id;
@@ -97,7 +104,7 @@ app.post('/api/guess', (req, res) => {
     
     let newHint = null;
     if (targetMisses) {
-        newHint = generateNewHint(target, feedback);
+        newHint = generateNewHint(target);
     }
     
     res.json({
@@ -112,11 +119,10 @@ app.post('/api/guess', (req, res) => {
     });
 });
 
-function generateNewHint(target, feedback) {
+function generateNewHint(target) {
     const hintFields = ['paid', 'initSystem', 'releaseType', 'parentDistro', 'packageManager', 'difficulty', 'yearReleased', 'desktopEnvironment', 'basedOn', 'architecture', 'category'];
-    
-    const discoveredFields = hintFields.filter(f => feedback[f] && feedback[f].status === 'correct');
-    const availableHints = hintFields.filter(f => !discoveredFields.includes(f) && !gameState.revealedHints.includes(f));
+
+    const availableHints = hintFields.filter(f => !gameState.discoveredFields.includes(f) && !gameState.revealedHints.includes(f));
     
     if (availableHints.length === 0) return null;
     
