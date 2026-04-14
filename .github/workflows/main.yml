@@ -23,3 +23,4 @@ jobs:
             cd /var/www/distrodle
             git fetch origin main
             git pull --ff-only origin main
+            sudo systemctl restart distrodle
