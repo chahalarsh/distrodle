@@ -14,12 +14,16 @@ const distros = require('./data/distros.json');
 // Game state storage (in-memory, per server instance)
 const gameState = {
     currentTarget: null,
-    previousTarget: null,
     wasGuessed: false,
     guessCount: 0,
     missCount: 0,
     revealedHints: [],
-    discoveredFields: []
+    discoveredFields: [],
+    // Stats tracking
+    totalGames: 0,
+    totalWins: 0,
+    currentStreak: 0,
+    bestStreak: 0
 };
 
 // Get all distro names for autocomplete
@@ -29,18 +33,27 @@ app.get('/api/distros', (req, res) => {
 
 // Get random target distro
 app.get('/api/target', (req, res) => {
-    // If there was a previous target that wasn't guessed, return it as the answer
-    const previousAnswer = (!gameState.wasGuessed && gameState.previousTarget) ? {
-        id: gameState.previousTarget.id,
-        name: gameState.previousTarget.name,
-        details: gameState.previousTarget
+    // If there was a current target that wasn't guessed, return it as the previous answer
+    // This fixes the bug where previousTarget was always 2 games behind
+    const previousAnswer = (!gameState.wasGuessed && gameState.currentTarget) ? {
+        id: gameState.currentTarget.id,
+        name: gameState.currentTarget.name,
+        details: gameState.currentTarget
     } : null;
+    
+    // Update stats: increment total games when starting a new game (not on initial load)
+    if (gameState.currentTarget !== null) {
+        gameState.totalGames++;
+        // If previous game wasn't guessed, reset current streak
+        if (!gameState.wasGuessed) {
+            gameState.currentStreak = 0;
+        }
+    }
     
     // Select new random target
     const randomDistro = distros[Math.floor(Math.random() * distros.length)];
     
     // Update game state
-    gameState.previousTarget = gameState.currentTarget;
     gameState.currentTarget = randomDistro;
     gameState.wasGuessed = false;
     gameState.guessCount = 0;
@@ -48,10 +61,20 @@ app.get('/api/target', (req, res) => {
     gameState.revealedHints = [];
     gameState.discoveredFields = [];
     
+    // Calculate hit rate
+    const hitRate = gameState.totalGames > 0 ? Math.round((gameState.totalWins / gameState.totalGames) * 100) : 0;
+    
     res.json({
         id: randomDistro.id,
         name: randomDistro.name,
-        previousAnswer: previousAnswer
+        previousAnswer: previousAnswer,
+        stats: {
+            totalGames: gameState.totalGames,
+            totalWins: gameState.totalWins,
+            hitRate: hitRate,
+            currentStreak: gameState.currentStreak,
+            bestStreak: gameState.bestStreak
+        }
     });
 });
 
@@ -92,6 +115,12 @@ app.post('/api/guess', (req, res) => {
     const isCorrect = guess.id === target.id;
     if (isCorrect) {
         gameState.wasGuessed = true;
+        gameState.totalWins++;
+        gameState.currentStreak++;
+        // Update best streak if current streak is higher
+        if (gameState.currentStreak > gameState.bestStreak) {
+            gameState.bestStreak = gameState.currentStreak;
+        }
     } else {
         gameState.missCount++;
     }

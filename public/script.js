@@ -6,6 +6,13 @@ let distroList = [];
 let guessedDistros = [];
 let isProcessing = false;
 let isInitialLoad = true;
+let gameStats = {
+    totalGames: 0,
+    totalWins: 0,
+    hitRate: 0,
+    currentStreak: 0,
+    bestStreak: 0
+};
 
 // DOM elements
 const guessInput = document.getElementById('guess-input');
@@ -77,13 +84,7 @@ async function initGame() {
         // Populate datalist
         updateDistroList();
         
-        // Update footer stats
-        const totalDistrosElement = document.getElementById('total-distros');
-        if (totalDistrosElement) {
-            totalDistrosElement.textContent = `${distroList.length} distros in database`;
-        }
-        
-        // Start new game
+        // Start new game (this will also load and display stats)
         startNewGame();
     } catch (error) {
         console.error('Error initializing game:', error);
@@ -123,6 +124,12 @@ async function startNewGame() {
         }
         isInitialLoad = false;
         
+        // Update stats from server
+        if (data.stats) {
+            gameStats = data.stats;
+            displayStats();
+        }
+        
         // Reset game state
         guessCount = 0;
         gameWon = false;
@@ -158,6 +165,18 @@ function showPreviousAnswer(previousAnswer) {
     
     // Insert before the feedback header
     feedbackHeader.parentNode.insertBefore(wrapper, feedbackHeader);
+}
+
+// Display game stats in the footer
+function displayStats() {
+    const totalDistrosElement = document.getElementById('total-distros');
+    if (totalDistrosElement) {
+        const statsText = `${distroList.length} distros | ` +
+            `Win Rate: ${gameStats.hitRate}% (${gameStats.totalWins}/${gameStats.totalGames}) | ` +
+            `Streak: ${gameStats.currentStreak} | ` +
+            `Best: ${gameStats.bestStreak}`;
+        totalDistrosElement.textContent = statsText;
+    }
 }
 
 // Handle guess submission
