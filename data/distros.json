@@ -891,5 +891,24 @@
     "category": "Desktop",
     "status": "Active",
     "popularity": "Low"
+  },
+  {
+    "id": "bazzite",
+    "name": "Bazzite",
+    "logo": "🟦",
+    "paid": false,
+    "initSystem": "systemd",
+    "releaseType": "Stable",
+    "parentDistro": "Fedora",
+    "packageManager": "rpm-ostree",
+    "difficulty": "Beginner",
+    "yearReleased": 2023,
+    "desktopEnvironment": "KDE",
+    "architecture": "x86_64",
+    "basedOn": "Fedora",
+    "origin": "Global",
+    "category": "Gaming, Desktop",
+    "status": "Active",
+    "popularity": "Medium"
   }
 ]
