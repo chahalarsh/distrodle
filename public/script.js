@@ -50,6 +50,13 @@ function getOptionQuery() {
     return `includeVeryLow=${gameOptions.includeVeryLow}&includeDiscontinued=${gameOptions.includeDiscontinued}`;
 }
 
+function applyOptionConstraints() {
+    // Discontinued pool is a strict subset that requires Very Low to be enabled.
+    if (gameOptions.includeDiscontinued) {
+        gameOptions.includeVeryLow = true;
+    }
+}
+
 async function loadDistroList() {
     const response = await fetch(`/api/distros?${getOptionQuery()}`);
     distroList = await response.json();
@@ -63,6 +70,7 @@ function loadOptions() {
         const parsed = JSON.parse(raw);
         gameOptions.includeVeryLow = parsed.includeVeryLow === true;
         gameOptions.includeDiscontinued = parsed.includeDiscontinued === true;
+        applyOptionConstraints();
     } catch (error) {
         console.warn('Failed to load options, using defaults:', error);
     }
@@ -75,6 +83,10 @@ function saveOptions() {
 function renderOptions() {
     if (toggleVeryLow) {
         toggleVeryLow.checked = gameOptions.includeVeryLow;
+        toggleVeryLow.disabled = gameOptions.includeDiscontinued;
+        toggleVeryLow.title = gameOptions.includeDiscontinued
+            ? 'Required while Discontinued is enabled'
+            : 'Include Very Low popularity distros';
     }
     if (toggleDiscontinued) {
         toggleDiscontinued.checked = gameOptions.includeDiscontinued;
@@ -217,12 +229,20 @@ async function startNewGame() {
         newGameBtn.disabled = true;
         playAgainBtn.disabled = true;
 
+        // Always refresh pool from current options before starting a new round.
+        await loadDistroList();
+
         const response = await fetch(`/api/target?${getOptionQuery()}`, {
             headers: {
                 'x-distrodle-client-id': getClientId()
             }
         });
         const data = await response.json();
+
+        if (!response.ok) {
+            showToast(data.error || 'Failed to start new game', 'error');
+            return;
+        }
 
         // Ignore stale responses from older in-flight requests.
         if (requestSeq !== newGameRequestSeq) {
@@ -249,6 +269,7 @@ async function startNewGame() {
         hasGuessedThisRound = false;
         guessedDistros = [];
         feedbackContainer.innerHTML = '';
+        displayStats();
         updateDistroList();
         if (firstGuessHelp) {
             firstGuessHelp.classList.remove('hidden');
@@ -741,7 +762,9 @@ guessInput.addEventListener('blur', () => {
 if (toggleVeryLow) {
     toggleVeryLow.addEventListener('change', async () => {
         gameOptions.includeVeryLow = toggleVeryLow.checked;
+        applyOptionConstraints();
         saveOptions();
+        renderOptions();
         await applyOptionsAndRestart();
     });
 }
@@ -749,7 +772,9 @@ if (toggleVeryLow) {
 if (toggleDiscontinued) {
     toggleDiscontinued.addEventListener('change', async () => {
         gameOptions.includeDiscontinued = toggleDiscontinued.checked;
+        applyOptionConstraints();
         saveOptions();
+        renderOptions();
         await applyOptionsAndRestart();
     });
 }

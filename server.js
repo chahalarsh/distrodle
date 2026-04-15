@@ -25,7 +25,7 @@ function parseBooleanOption(value, fallback = false) {
 }
 
 function getFilteredDistros(options = {}) {
-    const includeVeryLow = options.includeVeryLow === true;
+    const includeVeryLow = options.includeVeryLow === true || options.includeDiscontinued === true;
     const includeDiscontinued = options.includeDiscontinued === true;
 
     return distros.filter((distro) => {
