@@ -730,7 +730,7 @@
     "difficulty": "Beginner",
     "yearReleased": 2017,
     "desktopEnvironment": "COSMIC",
-    "architecture": "x86_64",
+    "architecture": "x86_64, ARM",
     "category": "Desktop",
     "popularity": "High",
     "discontinued": "No"
