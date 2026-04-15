@@ -86,7 +86,7 @@ function renderOptions() {
         toggleVeryLow.disabled = gameOptions.includeDiscontinued;
         toggleVeryLow.title = gameOptions.includeDiscontinued
             ? 'Required while Discontinued is enabled'
-            : 'Include Very Low popularity distros';
+            : 'Include unpopular distros';
     }
     if (toggleDiscontinued) {
         toggleDiscontinued.checked = gameOptions.includeDiscontinued;
