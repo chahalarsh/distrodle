@@ -729,8 +729,8 @@
     "packageManager": "APT",
     "difficulty": "Beginner",
     "yearReleased": 2017,
-    "desktopEnvironment": "GNOME",
-    "architecture": "x86_64",
+    "desktopEnvironment": "COSMIC",
+    "architecture": "x86_64, ARM",
     "category": "Desktop",
     "popularity": "High",
     "discontinued": "No"
