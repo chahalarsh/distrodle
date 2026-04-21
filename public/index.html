@@ -24,18 +24,29 @@
                     <span class="prompt">$</span>
                     <span class="command">./guess --distro</span>
                 </div>
-                <div id="options-panel">
-                    <span class="options-label">Pool options:</span>
-                    <label class="option-item" for="toggle-very-low">
-                        <input type="checkbox" id="toggle-very-low" title="Include unpopular distros">
-                        Unpopular
-                    </label>
-                    <label class="option-item" for="toggle-discontinued">
-                        <input type="checkbox" id="toggle-discontinued" title="Include discontinued distros">
-                        Discontinued
-                    </label>
-                    <button id="how-to-play-btn" class="btn option-help-btn">How To Play</button>
-                    <button id="learn-mode-btn" class="btn option-help-btn">Learn</button>
+                <div id="options-panel" class="options-collapsed">
+                    <div class="options-header-row">
+                        <span class="options-label">Filters & Help</span>
+                        <button id="options-toggle-btn" class="btn options-toggle-btn" type="button" aria-expanded="false" aria-controls="options-content">Show</button>
+                    </div>
+                    <div id="options-content" class="options-content">
+                        <div class="options-checkbox-col">
+                            <span class="options-sub-label">Pool options:</span>
+                            <label class="option-item" for="toggle-very-low">
+                                <input type="checkbox" id="toggle-very-low" title="Include unpopular distros">
+                                Unpopular
+                            </label>
+                            <label class="option-item" for="toggle-discontinued">
+                                <input type="checkbox" id="toggle-discontinued" title="Include discontinued distros">
+                                Discontinued
+                            </label>
+                        </div>
+                        <div class="options-actions-col">
+                            <span class="options-sub-label">Help:</span>
+                            <button id="how-to-play-btn" class="btn option-help-btn">How To Play</button>
+                            <button id="learn-mode-btn" class="btn option-help-btn">Learn</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="legend">

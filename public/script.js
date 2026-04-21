@@ -46,6 +46,10 @@ const toggleDiscontinued = document.getElementById('toggle-discontinued');
 const howToPlayBtn = document.getElementById('how-to-play-btn');
 const instructionsModal = document.getElementById('instructions-modal');
 const closeInstructionsBtn = document.getElementById('close-instructions-btn');
+const optionsPanel = document.getElementById('options-panel');
+const optionsToggleBtn = document.getElementById('options-toggle-btn');
+
+const OPTIONS_PANEL_COLLAPSED_KEY = 'distrodleOptionsPanelCollapsed';
 
 function getOptionQuery() {
     return `includeVeryLow=${gameOptions.includeVeryLow}&includeDiscontinued=${gameOptions.includeDiscontinued}`;
@@ -100,6 +104,45 @@ function loadOptions() {
 
 function saveOptions() {
     localStorage.setItem(OPTIONS_STORAGE_KEY, JSON.stringify(gameOptions));
+}
+
+function loadOptionsPanelState() {
+    try {
+        const raw = localStorage.getItem(OPTIONS_PANEL_COLLAPSED_KEY);
+        if (raw === null) {
+            return true;
+        }
+        return raw === 'true';
+    } catch (error) {
+        return true;
+    }
+}
+
+function saveOptionsPanelState(isCollapsed) {
+    localStorage.setItem(OPTIONS_PANEL_COLLAPSED_KEY, String(isCollapsed));
+}
+
+function renderOptionsPanelState() {
+    if (!optionsPanel || !optionsToggleBtn) return;
+
+    const isCollapsed = optionsPanel.classList.contains('options-collapsed');
+    optionsPanel.classList.toggle('options-expanded', !isCollapsed);
+    optionsToggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+    optionsToggleBtn.textContent = isCollapsed ? 'Show' : 'Hide';
+}
+
+function setOptionsPanelCollapsed(isCollapsed) {
+    if (!optionsPanel) return;
+    optionsPanel.classList.toggle('options-collapsed', isCollapsed);
+    optionsPanel.classList.toggle('options-expanded', !isCollapsed);
+    renderOptionsPanelState();
+    saveOptionsPanelState(isCollapsed);
+}
+
+function toggleOptionsPanelCollapsed() {
+    if (!optionsPanel) return;
+    const isCollapsed = optionsPanel.classList.contains('options-collapsed');
+    setOptionsPanelCollapsed(!isCollapsed);
 }
 
 function renderOptions() {
@@ -200,6 +243,7 @@ async function initGame() {
         renderStats();
         loadOptions();
         renderOptions();
+        setOptionsPanelCollapsed(loadOptionsPanelState());
 
         // Load distro list for autocomplete
         await loadDistroList();
@@ -1314,6 +1358,10 @@ if (howToPlayBtn) {
 
 if (closeInstructionsBtn) {
     closeInstructionsBtn.addEventListener('click', closeInstructionsModal);
+}
+
+if (optionsToggleBtn) {
+    optionsToggleBtn.addEventListener('click', toggleOptionsPanelCollapsed);
 }
 
 // Close modal when clicking outside

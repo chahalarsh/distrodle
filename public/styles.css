@@ -118,15 +118,44 @@ header p {
 
 #options-panel {
     display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    flex-wrap: nowrap;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
     padding: 0.2rem 0.35rem;
     border: 1px solid var(--border-color);
     border-radius: 3px;
     background: transparent;
     margin-left: auto;
-    white-space: nowrap;
+    min-width: 340px;
+}
+
+.options-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.45rem;
+}
+
+.options-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.options-checkbox-col,
+.options-actions-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.options-checkbox-col {
+    flex: 1;
+}
+
+.options-actions-col {
+    flex: 1;
 }
 
 .options-label {
@@ -135,6 +164,15 @@ header p {
     text-transform: uppercase;
     letter-spacing: 0.6px;
     font-weight: 700;
+}
+
+.options-sub-label {
+    color: var(--accent);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.55px;
+    font-weight: 700;
+    opacity: 0.9;
 }
 
 .option-item {
@@ -154,12 +192,28 @@ header p {
     transform: scale(0.9);
 }
 
+.options-toggle-btn {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    align-self: center;
+    padding: 0.22rem 0.45rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.5px;
+    line-height: 1.1;
+    border-width: 1px;
+}
+
 .option-help-btn {
-    margin-left: 0.15rem;
+    margin-left: 0;
     padding: 0.3rem 0.45rem;
     font-size: 0.64rem;
     letter-spacing: 0.6px;
     border-width: 1px;
+}
+
+#options-panel.options-collapsed .options-content {
+    display: none;
 }
 
 .prompt {
@@ -547,18 +601,61 @@ footer {
     }
 
     .game-info-top {
-        align-items: flex-start;
+        align-items: center;
+        flex-wrap: nowrap;
+    }
+
+    .info-line {
+        flex: 0 0 auto;
+        min-width: 0;
     }
 
     #options-panel {
-        width: 100%;
-        margin-left: 0;
-        justify-content: flex-start;
-        overflow-x: auto;
+        width: auto;
+        min-width: 0;
+        margin-left: auto;
+        padding: 0.3rem 0.35rem;
+        flex: 1 1 auto;
     }
 
-    .option-help-btn {
-        margin-left: 0;
+    #options-panel .options-header-row {
+        width: 100%;
+        align-items: center;
+    }
+
+    #options-panel .options-toggle-btn {
+        width: auto;
+        min-width: 64px;
+        flex: 0 0 auto;
+        padding: 0.3rem 0.55rem;
+        font-size: 0.64rem;
+        letter-spacing: 0.5px;
+    }
+
+    #options-panel .options-content {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.45rem;
+        align-items: start;
+    }
+
+    #options-panel .options-checkbox-col,
+    #options-panel .options-actions-col {
+        width: 100%;
+    }
+
+    #options-panel .option-item,
+    #options-panel .option-help-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    #options-panel .option-help-btn {
+        padding: 0.38rem 0.45rem;
+    }
+
+    #options-panel.options-collapsed .options-content {
+        display: none;
     }
     
     #input-section {
