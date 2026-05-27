@@ -1182,5 +1182,21 @@
     "category": "Desktop",
     "popularity": "Low",
     "discontinued": "No"
-  }
+  },
+  {
+    "id": "nyarchlinux",
+    "name": "Nyarch Linux",
+    "paid": false,
+    "initSystem": "systemd",
+    "releaseType": "Rolling",
+    "parentDistro": "Arch Linux",
+    "packageManager": "pacman",
+    "difficulty": "Intermediate",
+    "yearReleased": 2023,
+    "desktopEnvironment": "GNOME",
+    "architecture": "x86_64",
+    "category": "Desktop",
+    "popularity": "Low",
+    "discontinued": "No"
+}
 ]
