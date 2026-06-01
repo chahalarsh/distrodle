@@ -1063,12 +1063,12 @@
     "releaseType": "Rolling",
     "parentDistro": "Independent",
     "packageManager": "Guix",
-    "difficulty": "Advanced",
+    "difficulty": "Expert",
     "yearReleased": 2012,
     "desktopEnvironment": "None",
     "architecture": "x86_64, i686, ARM",
     "category": "Desktop",
-    "popularity": "Very Low",
+    "popularity": "Low",
     "discontinued": "No"
   },
   {
@@ -1198,5 +1198,21 @@
     "category": "Desktop",
     "popularity": "Low",
     "discontinued": "No"
-}
+  },
+  {
+    "id": "chimera",
+    "name": "Chimera Linux",
+    "paid": false,
+    "initSystem": "dinit",
+    "releaseType": "Rolling",
+    "parentDistro": "Independent",
+    "packageManager": "APK",
+    "difficulty": "Advanced",
+    "yearReleased": 2021,
+    "desktopEnvironment": "None",
+    "architecture": "x86_64, aarch64, loongarch64, ppc64, riscv64",
+    "category": "Desktop, Server",
+    "popularity": "Low",
+    "discontinued": "No"
+  }
 ]
