@@ -1190,7 +1190,7 @@
     "initSystem": "systemd",
     "releaseType": "Rolling",
     "parentDistro": "Arch Linux",
-    "packageManager": "pacman",
+    "packageManager": "Pacman",
     "difficulty": "Intermediate",
     "yearReleased": 2023,
     "desktopEnvironment": "GNOME",
