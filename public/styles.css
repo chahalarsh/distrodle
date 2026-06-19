@@ -9,6 +9,7 @@
     --correct: #4ade80;
     --partial: #facc15;
     --incorrect: #ef4444;
+    --near-miss: #fb923c;
 }
 
 * {
@@ -449,6 +450,51 @@ header p {
     background: rgba(239, 68, 68, 0.15);
     border-color: var(--incorrect);
     color: var(--incorrect);
+}
+
+/* Near-miss effect: every attribute is green except the distro name */
+@keyframes nearMissRowGlow {
+    0%   { box-shadow: 0 0 0 0 rgba(251, 146, 60, 0); }
+    50%  { box-shadow: 0 0 22px 4px rgba(251, 146, 60, 0.6); }
+    100% { box-shadow: 0 0 0 0 rgba(251, 146, 60, 0); }
+}
+
+@keyframes nearMissBadgeIn {
+    from { transform: scale(0.4); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes nearMissCellGlow {
+    0%, 100% { filter: brightness(1); }
+    50%      { filter: brightness(1.35); }
+}
+
+.feedback-row.near-miss {
+    position: relative;
+    border-radius: 6px;
+    animation: nearMissRowGlow 0.9s ease-in-out 3;
+}
+
+.feedback-row.near-miss .feedback-cell.correct {
+    animation: nearMissCellGlow 0.9s ease-in-out 3;
+}
+
+.feedback-row.near-miss::before {
+    content: "🔥 ALMOST";
+    position: absolute;
+    top: -0.7rem;
+    left: 0.5rem;
+    background: var(--bg-box);
+    color: var(--near-miss);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 0.18rem 0.5rem;
+    border: 1px solid var(--near-miss);
+    border-radius: 3px;
+    z-index: 2;
+    white-space: nowrap;
+    animation: nearMissBadgeIn 0.4s ease-out;
 }
 
 .feedback-cell-animated {

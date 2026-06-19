@@ -233,6 +233,21 @@ function playSound(type) {
             osc.start(audioContext.currentTime + i * 0.1);
             osc.stop(audioContext.currentTime + i * 0.1 + 0.3);
         });
+    } else if (type === 'nearMiss') {
+        // Triumphant-but-tense C-major triangle chord (C-E-G), staggered
+        const notes = [523.25, 659.25, 783.99];
+        notes.forEach((freq, i) => {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, audioContext.currentTime + i * 0.05);
+            gain.gain.setValueAtTime(0.18, audioContext.currentTime + i * 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + i * 0.05 + 0.55);
+            osc.start(audioContext.currentTime + i * 0.05);
+            osc.stop(audioContext.currentTime + i * 0.05 + 0.6);
+        });
     }
 }
 
@@ -686,6 +701,18 @@ function displayFeedback(feedback, matchedName) {
         row.appendChild(cell);
     });
     
+    // Near-miss: every attribute is correct except the distro name.
+    // Highlight the row, fire a celebratory toast, and play a chord.
+    const allOtherCorrect = attributes
+        .filter(a => a.key !== 'name')
+        .every(a => feedback[a.key].status === 'correct');
+    const nameWrong = feedback.name.status !== 'correct';
+    if (allOtherCorrect && nameWrong) {
+        row.classList.add('near-miss');
+        showToast('🔥 All attributes match — so close!', 'info');
+        playSound('nearMiss');
+    }
+
     // Add cell animation style if not exists
     if (!document.querySelector('#cell-style')) {
         const style = document.createElement('style');
