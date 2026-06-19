@@ -24,12 +24,58 @@ function parseBooleanOption(value, fallback = false) {
     return fallback;
 }
 
+// Map difficulty to the minimum popularity rank that should be included.
+// Rank: Very Low (0) < Low (1) < Medium (2) < High (3) < Very High (4)
+//   Very Easy = High and above (small, popular pool) - uniform
+//   Easy      = Medium and above - uniform
+//   Medium    = Low and above (everything except Very Low) - uniform
+//   Hard      = Low and above (same pool as Medium) - weighted toward Low
+//   Extreme   = all popularities (incl. Very Low) - weighted toward Low/Very Low
+const POPULARITY_RANK = {
+    'Very Low': 0,
+    'Low': 1,
+    'Medium': 2,
+    'High': 3,
+    'Very High': 4
+};
+
+const DIFFICULTY_MIN_RANK = {
+    'Very Easy': 3,
+    'Easy': 2,
+    'Medium': 1,
+    'Hard': 1,
+    'Extreme': 0
+};
+
+const DEFAULT_DIFFICULTY = 'Hard';
+const VALID_DIFFICULTIES = Object.keys(DIFFICULTY_MIN_RANK);
+
+// Popularity selection weights for Hard/Extreme. Very Easy/Easy/Medium use uniform random.
+// Order: [Very High, High, Medium, Low, Very Low]
+// Roughly uniform, but skewed away from the popular end (Very High / High are
+// rare since there are only 3 / 14 distros in those buckets) and toward Medium /
+// Low / Very Low which gives more variety in the target.
+const DIFFICULTY_WEIGHTS = {
+    'Hard':    [0.05, 0.10, 0.45, 0.40, 0.00],
+    'Extreme': [0.03, 0.07, 0.25, 0.35, 0.30]
+};
+const POPULARITY_ORDER = ['Very High', 'High', 'Medium', 'Low', 'Very Low'];
+
+function parseDifficultyOption(value) {
+    if (typeof value !== 'string') return DEFAULT_DIFFICULTY;
+    const normalized = value.trim();
+    if (VALID_DIFFICULTIES.includes(normalized)) return normalized;
+    return DEFAULT_DIFFICULTY;
+}
+
 function getFilteredDistros(options = {}) {
-    const includeVeryLow = options.includeVeryLow === true || options.includeDiscontinued === true;
+    const difficulty = parseDifficultyOption(options.difficulty);
     const includeDiscontinued = options.includeDiscontinued === true;
+    const minRank = DIFFICULTY_MIN_RANK[difficulty];
 
     return distros.filter((distro) => {
-        if (!includeVeryLow && distro.popularity === 'Very Low') {
+        const rank = POPULARITY_RANK[distro.popularity];
+        if (rank === undefined || rank < minRank) {
             return false;
         }
 
@@ -39,6 +85,62 @@ function getFilteredDistros(options = {}) {
 
         return true;
     });
+}
+
+// Get full distro data for the Distrodex (always includes everything).
+app.get('/api/distros/full', (req, res) => {
+    const filteredDistros = getFilteredDistros({
+        difficulty: 'Extreme',
+        includeDiscontinued: true
+    });
+
+    res.json(filteredDistros);
+});
+
+// Pick a random distro from the pool using difficulty-specific selection rules.
+// Easy/Medium: uniform random across the whole pool.
+// Hard/Extreme: bucket by popularity, pick a bucket with the configured weight,
+// then pick a uniform random distro from the chosen bucket. Weights for buckets
+// that are empty in the current pool are ignored (weights are renormalized).
+function pickTarget(pool, difficulty) {
+    if (pool.length === 0) return null;
+    if (pool.length === 1) return pool[0];
+
+    const weights = DIFFICULTY_WEIGHTS[difficulty];
+    if (!weights) {
+        // Easy / Medium / unknown -> uniform
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    // Group pool by popularity
+    const byPop = new Map();
+    for (const d of pool) {
+        const bucket = byPop.get(d.popularity) || [];
+        bucket.push(d);
+        byPop.set(d.popularity, bucket);
+    }
+
+    // Build list of (popularity, weight, distros) for buckets that exist in the pool
+    const available = POPULARITY_ORDER
+        .map((pop, i) => ({ pop, weight: weights[i] || 0, distros: byPop.get(pop) || [] }))
+        .filter(item => item.distros.length > 0 && item.weight > 0);
+
+    if (available.length === 0) {
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    const totalWeight = available.reduce((sum, x) => sum + x.weight, 0);
+    let r = Math.random() * totalWeight;
+    for (const item of available) {
+        r -= item.weight;
+        if (r <= 0) {
+            return item.distros[Math.floor(Math.random() * item.distros.length)];
+        }
+    }
+
+    // Floating point fallback: return from the last available bucket
+    const last = available[available.length - 1];
+    return last.distros[Math.floor(Math.random() * last.distros.length)];
 }
 
 function createInitialGameState() {
@@ -81,18 +183,19 @@ function getGameState(req) {
 
 // Get all distro names for autocomplete
 app.get('/api/distros', (req, res) => {
-    const includeVeryLow = parseBooleanOption(req.query.includeVeryLow, false);
+    const difficulty = parseDifficultyOption(req.query.difficulty);
     const includeDiscontinued = parseBooleanOption(req.query.includeDiscontinued, false);
-    const filteredDistros = getFilteredDistros({ includeVeryLow, includeDiscontinued });
+    const filteredDistros = getFilteredDistros({ difficulty, includeDiscontinued });
 
     res.json(filteredDistros.map(d => d.name));
 });
 
-// Get full distro data for Learn Mode
+// Get full distro data for Learn Mode (always everything)
 app.get('/api/distros/full', (req, res) => {
-    const includeVeryLow = parseBooleanOption(req.query.includeVeryLow, true);
-    const includeDiscontinued = parseBooleanOption(req.query.includeDiscontinued, true);
-    const filteredDistros = getFilteredDistros({ includeVeryLow, includeDiscontinued });
+    const filteredDistros = getFilteredDistros({
+        difficulty: 'Extreme',
+        includeDiscontinued: true
+    });
 
     res.json(filteredDistros);
 });
@@ -104,9 +207,9 @@ app.get('/api/target', (req, res) => {
         return res.status(400).json({ error: 'Missing client id' });
     }
 
-    const includeVeryLow = parseBooleanOption(req.query.includeVeryLow, false);
+    const difficulty = parseDifficultyOption(req.query.difficulty);
     const includeDiscontinued = parseBooleanOption(req.query.includeDiscontinued, false);
-    const availableDistros = getFilteredDistros({ includeVeryLow, includeDiscontinued });
+    const availableDistros = getFilteredDistros({ difficulty, includeDiscontinued });
 
     if (availableDistros.length === 0) {
         return res.status(400).json({ error: 'No distros available for selected filters' });
@@ -129,9 +232,10 @@ app.get('/api/target', (req, res) => {
         }
     }
     
-    // Select new random target
-    const randomDistro = availableDistros[Math.floor(Math.random() * availableDistros.length)];
-    
+    // Select new random target (difficulty-aware: uniform for Easy/Medium,
+    // weighted by popularity for Hard/Extreme)
+    const randomDistro = pickTarget(availableDistros, difficulty);
+
     // Update game state
     gameState.currentTarget = randomDistro;
     gameState.wasGuessed = false;
@@ -286,11 +390,11 @@ function compareDistros(guess, target) {
         },
         parentDistro: {
             value: guess.parentDistro,
-            status: getStatus(guess.parentDistro, target.parentDistro)
+            status: getParentStatus(guess, target)
         },
         packageManager: {
             value: guess.packageManager,
-            status: getStatus(guess.packageManager, target.packageManager)
+            status: getPackageManagerStatus(guess.packageManager, target.packageManager)
         },
         difficulty: {
             value: guess.difficulty,
@@ -302,20 +406,20 @@ function compareDistros(guess, target) {
             direction: getYearDirection(guess.yearReleased, target.yearReleased)
         },
         desktopEnvironment: {
-            value: guess.desktopEnvironment,
-            status: getStatus(guess.desktopEnvironment, target.desktopEnvironment)
+            value: formatMultiValue(guess.desktopEnvironment),
+            status: getMultiValueStatus(guess.desktopEnvironment, target.desktopEnvironment)
         },
         popularity: {
             value: guess.popularity,
             status: getPopularityStatus(guess.popularity, target.popularity)
         },
         architecture: {
-            value: guess.architecture,
-            status: getStatus(guess.architecture, target.architecture)
+            value: formatMultiValue(guess.architecture),
+            status: getMultiValueStatus(guess.architecture, target.architecture)
         },
         category: {
-            value: sortCategoryValues(guess.category),
-            status: getCategoryStatus(guess.category, target.category)
+            value: formatMultiValue(guess.category),
+            status: getMultiValueStatus(guess.category, target.category)
         }
     };
 }
@@ -325,38 +429,67 @@ function getStatus(guess, target) {
     return 'incorrect';
 }
 
-// Helper function to sort category values alphabetically
-function sortCategoryValues(category) {
-    if (!category || typeof category !== 'string') return category;
-    return category
+// Normalize a comma-separated value into a sorted, trimmed string.
+// e.g. "ARM, x86_64" -> "ARM, x86_64"
+function formatMultiValue(value) {
+    if (!value || typeof value !== 'string') return value;
+    return value
         .split(',')
         .map(s => s.trim())
+        .filter(s => s.length > 0)
         .sort((a, b) => a.localeCompare(b))
         .join(', ');
 }
 
-// Helper function to compare categories with partial matching
-function getCategoryStatus(guessCategory, targetCategory) {
-    const sortedGuess = sortCategoryValues(guessCategory);
-    const sortedTarget = sortCategoryValues(targetCategory);
-    
-    // If exact match after sorting, return correct
-    if (sortedGuess === sortedTarget) return 'correct';
-    
-    // Split into arrays for comparison
-    const guessItems = sortedGuess.split(', ').map(s => s.trim()).filter(s => s);
-    const targetItems = sortedTarget.split(', ').map(s => s.trim()).filter(s => s);
-    
-    // Check if there's at least one common element
-    const hasCommonElement = guessItems.some(item => targetItems.includes(item));
-    
-    if (hasCommonElement) return 'partial';
+// Split a comma-separated value into a normalized (lowercased, trimmed) array.
+function splitMultiValue(value) {
+    if (!value || typeof value !== 'string') return [];
+    return value
+        .split(',')
+        .map(s => s.trim().toLowerCase())
+        .filter(s => s.length > 0);
+}
+
+// Generic status for comma-separated fields (architecture, desktopEnvironment, category).
+// Order-insensitive and case-insensitive: "x86_64, ARM" vs "ARM, x86_64" is a match.
+// - correct  = same set of values
+// - partial  = at least one element in common, but not the same set
+// - incorrect = no overlap
+function getMultiValueStatus(guess, target) {
+    if (guess == null || target == null) return 'incorrect';
+    if (typeof guess !== 'string' || typeof target !== 'string') return 'incorrect';
+
+    if (guess === target) return 'correct';
+
+    const guessItems = splitMultiValue(guess);
+    const targetItems = splitMultiValue(target);
+
+    if (guessItems.length === 0 || targetItems.length === 0) return 'incorrect';
+
+    const sameSize = guessItems.length === targetItems.length;
+    const sameSet = sameSize && guessItems.every(g => targetItems.includes(g));
+    if (sameSet) return 'correct';
+
+    const hasCommon = guessItems.some(g => targetItems.includes(g));
+    return hasCommon ? 'partial' : 'incorrect';
+}
+
+// Package manager comparison is case-insensitive to avoid issues like
+// "Pacman" vs "pacman" being treated as different.
+function getPackageManagerStatus(guess, target) {
+    if (typeof guess !== 'string' || typeof target !== 'string') return 'incorrect';
+    if (guess.toLowerCase() === target.toLowerCase()) return 'correct';
     return 'incorrect';
 }
 
+// Parent distro: exact match is correct, and we treat being the same upstream
+// family (i.e. guessing the target's own parent) as partial. This avoids the
+// "Mandriva" / "Mandriva Linux" type name mismatches penalising the player.
 function getParentStatus(guess, target) {
-    if (guess === target) return 'correct';
-    if (target.parentDistro === 'Independent' || guess === target.baseFor) return 'partial';
+    if (!guess || !target) return 'incorrect';
+    if (guess.parentDistro === target.parentDistro) return 'correct';
+    if (guess.parentDistro === target.name) return 'partial';
+    if (target.parentDistro === guess.name) return 'partial';
     return 'incorrect';
 }
 

@@ -25,8 +25,10 @@ let currentRoundToken = 0;
 let distroListRequestSeq = 0;
 const CLIENT_ID_STORAGE_KEY = 'distrodleClientId';
 const OPTIONS_STORAGE_KEY = 'distrodleOptions';
+const VALID_DIFFICULTIES = ['Very Easy', 'Easy', 'Medium', 'Hard', 'Extreme'];
+const DEFAULT_DIFFICULTY = 'Hard';
 let gameOptions = {
-    includeVeryLow: false,
+    difficulty: DEFAULT_DIFFICULTY,
     includeDiscontinued: false
 };
 
@@ -41,8 +43,8 @@ const victoryModal = document.getElementById('victory-modal');
 const guessCountElement = document.getElementById('guess-count');
 const playAgainBtn = document.getElementById('play-again-btn');
 const firstGuessHelp = document.getElementById('first-guess-help');
-const toggleVeryLow = document.getElementById('toggle-very-low');
 const toggleDiscontinued = document.getElementById('toggle-discontinued');
+const difficultySelect = document.getElementById('difficulty-select');
 const howToPlayBtn = document.getElementById('how-to-play-btn');
 const instructionsModal = document.getElementById('instructions-modal');
 const closeInstructionsBtn = document.getElementById('close-instructions-btn');
@@ -52,14 +54,11 @@ const optionsToggleBtn = document.getElementById('options-toggle-btn');
 const OPTIONS_PANEL_COLLAPSED_KEY = 'distrodleOptionsPanelCollapsed';
 
 function getOptionQuery() {
-    return `includeVeryLow=${gameOptions.includeVeryLow}&includeDiscontinued=${gameOptions.includeDiscontinued}`;
+    return `difficulty=${encodeURIComponent(gameOptions.difficulty)}&includeDiscontinued=${gameOptions.includeDiscontinued}`;
 }
 
 function applyOptionConstraints() {
-    // Discontinued pool is a strict subset that requires Very Low to be enabled.
-    if (gameOptions.includeDiscontinued) {
-        gameOptions.includeVeryLow = true;
-    }
+    // Discontinued is a separate toggle; no implicit dependency on difficulty.
 }
 
 async function loadDistroList() {
@@ -94,8 +93,32 @@ function loadOptions() {
         if (!raw) return;
 
         const parsed = JSON.parse(raw);
-        gameOptions.includeVeryLow = parsed.includeVeryLow === true;
-        gameOptions.includeDiscontinued = parsed.includeDiscontinued === true;
+
+        // Migrate from older option shapes.
+        // Legacy v1 (4 tiers: Easy/Medium/Hard/Extreme): old "Easy" was a
+        // smaller pool (High + Very High only); that pool is now "Very Easy",
+        // so map it to preserve the user's prior experience.
+        // Legacy v0 (very old { includeVeryLow } shape): map to closest match.
+        if (parsed && typeof parsed === 'object') {
+            if (typeof parsed.difficulty === 'string') {
+                if (parsed.difficulty === 'Easy') {
+                    // Old "Easy" -> "Very Easy" (same small pool as before)
+                    gameOptions.difficulty = 'Very Easy';
+                } else if (VALID_DIFFICULTIES.includes(parsed.difficulty)) {
+                    gameOptions.difficulty = parsed.difficulty;
+                } else if (parsed.includeVeryLow === true) {
+                    gameOptions.difficulty = 'Extreme';
+                } else {
+                    gameOptions.difficulty = DEFAULT_DIFFICULTY;
+                }
+            } else if (parsed.includeVeryLow === true) {
+                gameOptions.difficulty = 'Extreme';
+            }
+        }
+
+        if (parsed && typeof parsed.includeDiscontinued === 'boolean') {
+            gameOptions.includeDiscontinued = parsed.includeDiscontinued;
+        }
         applyOptionConstraints();
     } catch (error) {
         console.warn('Failed to load options, using defaults:', error);
@@ -146,16 +169,21 @@ function toggleOptionsPanelCollapsed() {
 }
 
 function renderOptions() {
-    if (toggleVeryLow) {
-        toggleVeryLow.checked = gameOptions.includeVeryLow;
-        toggleVeryLow.disabled = gameOptions.includeDiscontinued;
-        toggleVeryLow.title = gameOptions.includeDiscontinued
-            ? 'Required while Discontinued is enabled'
-            : 'Include unpopular distros';
+    if (difficultySelect && difficultySelect.value !== gameOptions.difficulty) {
+        difficultySelect.value = gameOptions.difficulty;
     }
     if (toggleDiscontinued) {
         toggleDiscontinued.checked = gameOptions.includeDiscontinued;
     }
+}
+
+function setDifficulty(difficulty) {
+    if (!VALID_DIFFICULTIES.includes(difficulty)) return;
+    if (gameOptions.difficulty === difficulty) return;
+    gameOptions.difficulty = difficulty;
+    saveOptions();
+    renderOptions();
+    applyOptionsAndRestart();
 }
 
 async function applyOptionsAndRestart() {
@@ -694,13 +722,13 @@ function displayFeedback(feedback, matchedName) {
         
         cell.textContent = displayValue;
         cell.dataset.label = attr.label;
-        
+
         cell.style.setProperty('--cell-index', index);
         cell.classList.add('feedback-cell-animated');
-        
+
         row.appendChild(cell);
     });
-    
+
     // Near-miss: every attribute is correct except the distro name.
     // Highlight the row, fire a celebratory toast, and play a chord.
     const allOtherCorrect = attributes
@@ -774,27 +802,27 @@ function toggleInstructionsModal() {
     }
 }
 
-// Learn Mode state and functions
-let learnModeTree = null;
-let learnModeDistros = null;
-let learnModeFilters = {
+// Distrodex (family tree of every distro in the game)
+let distrodexTree = null;
+let distrodexDistros = null;
+let distrodexFilters = {
     search: '',
     category: 'all',
     paidOnly: false,
     activeOnly: true
 };
-let searchDebounceTimer = null;
+let distrodexSearchDebounceTimer = null;
 
-const learnModeModal = document.getElementById('learn-mode-modal');
-const learnModeBtn = document.getElementById('learn-mode-btn');
-const closeLearnModeBtn = document.getElementById('close-learn-mode-btn');
-const learnTreeContainer = document.getElementById('learn-tree-container');
-const learnSearchInput = document.getElementById('learn-search');
-const learnCategoryFilter = document.getElementById('learn-category-filter');
-const learnPaidOnlyCheckbox = document.getElementById('learn-paid-only');
-const learnActiveOnlyCheckbox = document.getElementById('learn-active-only');
-const learnExpandAllBtn = document.getElementById('learn-expand-all');
-const learnCollapseAllBtn = document.getElementById('learn-collapse-all');
+const distrodexModal = document.getElementById('distrodex-modal');
+const distrodexBtn = document.getElementById('distrodex-btn');
+const closeDistrodexBtn = document.getElementById('close-distrodex-btn');
+const distrodexTreeContainer = document.getElementById('distrodex-tree-container');
+const distrodexSearchInput = document.getElementById('distrodex-search');
+const distrodexCategoryFilter = document.getElementById('distrodex-category-filter');
+const distrodexPaidOnlyCheckbox = document.getElementById('distrodex-paid-only');
+const distrodexActiveOnlyCheckbox = document.getElementById('distrodex-active-only');
+const distrodexExpandAllBtn = document.getElementById('distrodex-expand-all');
+const distrodexCollapseAllBtn = document.getElementById('distrodex-collapse-all');
 
 function buildDistroTree(distros) {
     // Create a map of all distros
@@ -813,7 +841,6 @@ function buildDistroTree(distros) {
         const node = distroMap.get(distro.name);
         let parentName = distro.parentDistro;
 
-        // Special case for Mageia
         if (parentName === 'Mandriva' && !distroMap.has('Mandriva')) {
             parentName = 'Mandriva Linux';
         }
@@ -880,50 +907,50 @@ function getNodeSymbols(node) {
     return symbols.join(' ');
 }
 
-function matchesFilters(node) {
+function distrodexMatchesFilters(node) {
     // Search filter
-    if (learnModeFilters.search) {
-        const searchLower = learnModeFilters.search.toLowerCase();
+    if (distrodexFilters.search) {
+        const searchLower = distrodexFilters.search.toLowerCase();
         if (!node.name.toLowerCase().includes(searchLower)) {
             return false;
         }
     }
 
     // Category filter
-    if (learnModeFilters.category !== 'all') {
-        if (!node.category.toLowerCase().includes(learnModeFilters.category.toLowerCase())) {
+    if (distrodexFilters.category !== 'all') {
+        if (!node.category.toLowerCase().includes(distrodexFilters.category.toLowerCase())) {
             return false;
         }
     }
 
     // Paid filter
-    if (learnModeFilters.paidOnly && !node.paid) {
+    if (distrodexFilters.paidOnly && !node.paid) {
         return false;
     }
 
     // Active filter
-    if (learnModeFilters.activeOnly && node.discontinued === 'Yes') {
+    if (distrodexFilters.activeOnly && node.discontinued === 'Yes') {
         return false;
     }
 
     return true;
 }
 
-function hasMatchingDescendants(node) {
-    if (matchesFilters(node)) {
+function distrodexHasMatchingDescendants(node) {
+    if (distrodexMatchesFilters(node)) {
         return true;
     }
 
-    return node.children.some(hasMatchingDescendants);
+    return node.children.some(distrodexHasMatchingDescendants);
 }
 
 function renderTreeNode(node, level = 0, isLastChild = true, prefix = '') {
     // Check if this node or any descendants match filters
-    if (!hasMatchingDescendants(node)) {
+    if (!distrodexHasMatchingDescendants(node)) {
         return '';
     }
 
-    const nodeMatches = matchesFilters(node);
+    const nodeMatches = distrodexMatchesFilters(node);
     const categoryClass = getCategoryClass(node.category);
     const difficultyClass = getDifficultyClass(node.difficulty);
     const symbols = getNodeSymbols(node);
@@ -989,11 +1016,11 @@ function renderTreeNode(node, level = 0, isLastChild = true, prefix = '') {
     return html;
 }
 
-function renderLearnModeTree() {
-    if (!learnModeTree || !learnTreeContainer) return;
+function renderDistrodexTree() {
+    if (!distrodexTree || !distrodexTreeContainer) return;
 
     let html = '';
-    learnModeTree.forEach(root => {
+    distrodexTree.forEach(root => {
         html += renderTreeNode(root, 0, true, '');
     });
 
@@ -1001,48 +1028,47 @@ function renderLearnModeTree() {
         html = '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">No distros match the current filters.</div>';
     }
 
-    learnTreeContainer.innerHTML = html;
+    distrodexTreeContainer.innerHTML = html;
 
     // Add click handlers for expand/collapse
-    learnTreeContainer.querySelectorAll('.tree-node').forEach(nodeEl => {
+    distrodexTreeContainer.querySelectorAll('.tree-node').forEach(nodeEl => {
         const nodeId = nodeEl.dataset.nodeId;
         const expandIcon = nodeEl.querySelector('.tree-expand-icon');
 
         if (expandIcon && !expandIcon.classList.contains('no-children')) {
             expandIcon.addEventListener('click', (e) => {
                 e.stopPropagation();
-                toggleNodeExpansion(nodeId);
+                toggleDistrodexNode(nodeId);
             });
         }
     });
 
     // Add tooltip handlers for distro names
-    setupDistroTooltips();
+    setupDistrodexTooltips();
 }
 
-let tooltipElement = null;
+let distrodexTooltipElement = null;
 
-function setupDistroTooltips() {
-    const distroNames = learnTreeContainer.querySelectorAll('.tree-node-name');
+function setupDistrodexTooltips() {
+    const distroNames = distrodexTreeContainer.querySelectorAll('.tree-node-name');
 
     distroNames.forEach(nameEl => {
-        nameEl.addEventListener('mouseenter', showDistroTooltip);
-        nameEl.addEventListener('mousemove', moveDistroTooltip);
-        nameEl.addEventListener('mouseleave', hideDistroTooltip);
+        nameEl.addEventListener('mouseenter', showDistrodexTooltip);
+        nameEl.addEventListener('mousemove', moveDistrodexTooltip);
+        nameEl.addEventListener('mouseleave', hideDistrodexTooltip);
     });
 }
 
-function showDistroTooltip(e) {
+function showDistrodexTooltip(e) {
     const distroData = JSON.parse(e.target.dataset.distro);
 
-    // Create tooltip element
-    tooltipElement = document.createElement('div');
-    tooltipElement.className = 'distro-tooltip';
+    distrodexTooltipElement = document.createElement('div');
+    distrodexTooltipElement.className = 'distro-tooltip';
 
     const paidStatus = distroData.paid ? 'Yes' : 'No';
     const discontinuedStatus = distroData.discontinued;
 
-    tooltipElement.innerHTML = `
+    distrodexTooltipElement.innerHTML = `
         <div class="distro-tooltip-header">${distroData.name}</div>
         <div class="distro-tooltip-row">
             <span class="distro-tooltip-label">Year Released:</span>
@@ -1094,43 +1120,40 @@ function showDistroTooltip(e) {
         </div>
     `;
 
-    document.body.appendChild(tooltipElement);
-    moveDistroTooltip(e);
+    document.body.appendChild(distrodexTooltipElement);
+    moveDistrodexTooltip(e);
 }
 
-function moveDistroTooltip(e) {
-    if (!tooltipElement) return;
+function moveDistrodexTooltip(e) {
+    if (!distrodexTooltipElement) return;
 
-    const tooltipWidth = tooltipElement.offsetWidth;
-    const tooltipHeight = tooltipElement.offsetHeight;
+    const tooltipWidth = distrodexTooltipElement.offsetWidth;
+    const tooltipHeight = distrodexTooltipElement.offsetHeight;
     const padding = 15;
 
     let left = e.clientX + padding;
     let top = e.clientY + padding;
 
-    // Adjust if tooltip goes off right edge
     if (left + tooltipWidth > window.innerWidth) {
         left = e.clientX - tooltipWidth - padding;
     }
 
-    // Adjust if tooltip goes off bottom edge
     if (top + tooltipHeight > window.innerHeight) {
         top = e.clientY - tooltipHeight - padding;
     }
 
-    tooltipElement.style.left = left + 'px';
-    tooltipElement.style.top = top + 'px';
+    distrodexTooltipElement.style.left = left + 'px';
+    distrodexTooltipElement.style.top = top + 'px';
 }
 
-function hideDistroTooltip() {
-    if (tooltipElement) {
-        tooltipElement.remove();
-        tooltipElement = null;
+function hideDistrodexTooltip() {
+    if (distrodexTooltipElement) {
+        distrodexTooltipElement.remove();
+        distrodexTooltipElement = null;
     }
 }
 
-function toggleNodeExpansion(nodeId) {
-    // Find and toggle the node in the tree
+function toggleDistrodexNode(nodeId) {
     function toggleInTree(nodes) {
         for (const node of nodes) {
             if (node.id === nodeId) {
@@ -1144,128 +1167,125 @@ function toggleNodeExpansion(nodeId) {
         return false;
     }
 
-    toggleInTree(learnModeTree);
-    renderLearnModeTree();
+    toggleInTree(distrodexTree);
+    renderDistrodexTree();
 }
 
-function expandAllNodes(nodes) {
+function expandAllDistrodexNodes(nodes) {
     nodes.forEach(node => {
         node.isExpanded = true;
         if (node.children.length > 0) {
-            expandAllNodes(node.children);
+            expandAllDistrodexNodes(node.children);
         }
     });
 }
 
-function collapseAllNodes(nodes) {
+function collapseAllDistrodexNodes(nodes) {
     nodes.forEach(node => {
         node.isExpanded = false;
         if (node.children.length > 0) {
-            collapseAllNodes(node.children);
+            collapseAllDistrodexNodes(node.children);
         }
     });
 }
 
-async function openLearnMode() {
-    if (!learnModeModal) return;
+async function openDistrodex() {
+    if (!distrodexModal) return;
 
     // Fetch distros if not already loaded
-    if (!learnModeDistros) {
+    if (!distrodexDistros) {
         try {
-            const response = await fetch('/api/distros/full?includeVeryLow=true&includeDiscontinued=true');
+            const response = await fetch('/api/distros/full');
             if (!response.ok) {
-                showToast('Failed to load distros for Learn Mode', 'error');
+                showToast('Failed to load distros for the Distrodex', 'error');
                 return;
             }
-            learnModeDistros = await response.json();
+            distrodexDistros = await response.json();
         } catch (error) {
             console.error('Error loading distros:', error);
-            showToast('Failed to load distros for Learn Mode', 'error');
+            showToast('Failed to load distros for the Distrodex', 'error');
             return;
         }
     }
 
     // Build tree if not already built
-    if (!learnModeTree) {
-        learnModeTree = buildDistroTree(learnModeDistros);
+    if (!distrodexTree) {
+        distrodexTree = buildDistroTree(distrodexDistros);
     }
 
-    // Render tree
-    renderLearnModeTree();
-
-    // Show modal
-    learnModeModal.classList.remove('hidden');
+    renderDistrodexTree();
+    distrodexModal.classList.remove('hidden');
 }
 
-function closeLearnMode() {
-    if (!learnModeModal) return;
-    learnModeModal.classList.add('hidden');
-    hideDistroTooltip();
+function closeDistrodex() {
+    if (!distrodexModal) return;
+    distrodexModal.classList.add('hidden');
+    hideDistrodexTooltip();
 }
 
-function applyLearnModeFilters() {
-    renderLearnModeTree();
+function applyDistrodexFilters() {
+    renderDistrodexTree();
 }
 
-// Event listeners for Learn Mode
-if (learnModeBtn) {
-    learnModeBtn.addEventListener('click', openLearnMode);
+// Event listeners for the Distrodex
+if (distrodexBtn) {
+    distrodexBtn.addEventListener('click', openDistrodex);
 }
 
-if (closeLearnModeBtn) {
-    closeLearnModeBtn.addEventListener('click', closeLearnMode);
+if (closeDistrodexBtn) {
+    closeDistrodexBtn.addEventListener('click', closeDistrodex);
 }
 
-if (learnModeModal) {
-    learnModeModal.addEventListener('click', (e) => {
-        if (e.target === learnModeModal) {
-            closeLearnMode();
+if (distrodexModal) {
+    distrodexModal.addEventListener('click', (e) => {
+        if (e.target === distrodexModal) {
+            closeDistrodex();
         }
     });
 }
 
-if (learnSearchInput) {
-    learnSearchInput.addEventListener('input', (e) => {
-        clearTimeout(searchDebounceTimer);
-        searchDebounceTimer = setTimeout(() => {
-            learnModeFilters.search = e.target.value.trim();
-            applyLearnModeFilters();
+if (distrodexSearchInput) {
+    distrodexSearchInput.addEventListener('input', (e) => {
+        clearTimeout(distrodexSearchDebounceTimer);
+        distrodexSearchDebounceTimer = setTimeout(() => {
+            distrodexFilters.search = e.target.value.trim();
+            applyDistrodexFilters();
         }, 300);
     });
 }
 
-if (learnCategoryFilter) {
-    learnCategoryFilter.addEventListener('change', (e) => {
-        learnModeFilters.category = e.target.value;
-        applyLearnModeFilters();
+if (distrodexCategoryFilter) {
+    distrodexCategoryFilter.addEventListener('change', (e) => {
+        distrodexFilters.category = e.target.value;
+        applyDistrodexFilters();
     });
 }
 
-if (learnPaidOnlyCheckbox) {
-    learnPaidOnlyCheckbox.addEventListener('change', (e) => {
-        learnModeFilters.paidOnly = e.target.checked;
-        applyLearnModeFilters();
+if (distrodexPaidOnlyCheckbox) {
+    distrodexPaidOnlyCheckbox.addEventListener('change', (e) => {
+        distrodexFilters.paidOnly = e.target.checked;
+        applyDistrodexFilters();
     });
 }
 
-if (learnActiveOnlyCheckbox) {
-    learnActiveOnlyCheckbox.addEventListener('change', (e) => {
-        learnModeFilters.activeOnly = e.target.checked;
-        applyLearnModeFilters();
+if (distrodexActiveOnlyCheckbox) {
+    distrodexActiveOnlyCheckbox.addEventListener('change', (e) => {
+        distrodexFilters.activeOnly = e.target.checked;
+        applyDistrodexFilters();
     });
 }
 
-if (learnExpandAllBtn) {
-    learnExpandAllBtn.addEventListener('click', () => {
-        expandAllNodes(learnModeTree);
-        renderLearnModeTree();
+if (distrodexExpandAllBtn) {
+    distrodexExpandAllBtn.addEventListener('click', () => {
+        expandAllDistrodexNodes(distrodexTree);
+        renderDistrodexTree();
     });
 }
 
-if (learnCollapseAllBtn) {
-    learnCollapseAllBtn.addEventListener('click', () => {
-        collapseAllNodes(learnModeTree);
-        renderLearnModeTree();
+if (distrodexCollapseAllBtn) {
+    distrodexCollapseAllBtn.addEventListener('click', () => {
+        collapseAllDistrodexNodes(distrodexTree);
+        renderDistrodexTree();
     });
 }
 
@@ -1355,16 +1375,6 @@ guessInput.addEventListener('blur', () => {
     distroListElement.innerHTML = '';
 });
 
-if (toggleVeryLow) {
-    toggleVeryLow.addEventListener('change', async () => {
-        gameOptions.includeVeryLow = toggleVeryLow.checked;
-        applyOptionConstraints();
-        saveOptions();
-        renderOptions();
-        await applyOptionsAndRestart();
-    });
-}
-
 if (toggleDiscontinued) {
     toggleDiscontinued.addEventListener('change', async () => {
         gameOptions.includeDiscontinued = toggleDiscontinued.checked;
@@ -1372,6 +1382,12 @@ if (toggleDiscontinued) {
         saveOptions();
         renderOptions();
         await applyOptionsAndRestart();
+    });
+}
+
+if (difficultySelect) {
+    difficultySelect.addEventListener('change', () => {
+        setDifficulty(difficultySelect.value);
     });
 }
 
@@ -1416,7 +1432,7 @@ document.addEventListener('keypress', (e) => {
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         closeInstructionsModal();
-        closeLearnMode();
+        closeDistrodex();
     }
 });
 

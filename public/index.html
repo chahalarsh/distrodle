@@ -31,11 +31,14 @@
                     </div>
                     <div id="options-content" class="options-content">
                         <div class="options-checkbox-col">
-                            <span class="options-sub-label">Pool options:</span>
-                            <label class="option-item" for="toggle-very-low">
-                                <input type="checkbox" id="toggle-very-low" title="Include unpopular distros">
-                                Unpopular
-                            </label>
+                            <span class="options-sub-label">Difficulty:</span>
+                            <select id="difficulty-select" class="difficulty-select" aria-label="Difficulty">
+                                <option value="Very Easy">Very Easy</option>
+                                <option value="Easy">Easy</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Hard" selected>Hard</option>
+                                <option value="Extreme">Extreme</option>
+                            </select>
                             <label class="option-item" for="toggle-discontinued">
                                 <input type="checkbox" id="toggle-discontinued" title="Include discontinued distros">
                                 Discontinued
@@ -44,7 +47,7 @@
                         <div class="options-actions-col">
                             <span class="options-sub-label">Help:</span>
                             <button id="how-to-play-btn" class="btn option-help-btn">How To Play</button>
-                            <button id="learn-mode-btn" class="btn option-help-btn">Learn</button>
+                            <button id="distrodex-btn" class="btn option-help-btn">Distrodex</button>
                         </div>
                     </div>
                 </div>
@@ -116,29 +119,40 @@
         <div id="instructions-modal" class="hidden">
             <div class="modal-content instructions-content">
                 <h2>How Distrodle Works</h2>
-                <p>Find the hidden Linux distro by comparing attributes from each guess.</p>
+                <p>Pick a difficulty, then guess the hidden Linux distro in as few tries as you can. Every guess is graded across 12 attributes.</p>
                 <ul class="instructions-list">
-                    <li>Type a distro name and click Guess.</li>
-                    <li>Green means exact match, yellow means close, red means different.</li>
-                    <li>For year, arrows show if the target is newer or older.</li>
-                    <li>Every 5 misses, you get one extra hint.</li>
-                    <li>Pool options let you include Very Low popularity and discontinued distros.</li>
+                    <li><strong>Goal:</strong> turn every cell green. That means your guess matches the target on every attribute and the round is solved.</li>
+                    <li><strong>Difficulty</strong> sets how deep the pool goes by minimum popularity:
+                        <ul class="instructions-sub-list">
+                            <li><strong>Easy</strong> — Very High and High popularity only. A handful of well-known distros.</li>
+                            <li><strong>Medium</strong> — adds Medium popularity. A noticeably bigger pool.</li>
+                            <li><strong>Hard</strong> — also includes Low popularity. The default.</li>
+                            <li><strong>Extreme</strong> — the full list, including Very Low popularity and discontinued distros.</li>
+                        </ul>
+                    </li>
+                    <li><strong>The 12 attributes:</strong> Distro name, Paid, Init system, Release model, Parent distro, Package manager, Difficulty, Year released, Desktop, Popularity, Architecture, and Category.</li>
+                    <li><strong>Reading the cells:</strong> green = exact match, yellow = partial match (the values overlap, e.g. a shared category or family), red = no match.</li>
+                    <li><strong>The Year column is special:</strong> the number is followed by an arrow — <em>↑</em> means the target was released later, <em>↓</em> means it was released earlier. Use it to home in on the era.</li>
+                    <li><strong>Hints:</strong> every 5 wrong guesses the game reveals one attribute of the target as a toast. Spend them when you're stuck.</li>
+                    <li><strong>Discontinued</strong> is a separate toggle on top of difficulty. It adds retired distros to whichever pool you picked.</li>
+                    <li><strong>New Game</strong> at any time skips the round and shows the previous answer. Skipping after guessing counts as a loss.</li>
+                    <li><strong>Distrodex</strong> (in the options panel) is a searchable family tree of every distro in the game.</li>
                 </ul>
                 <button id="close-instructions-btn" class="btn">Close</button>
             </div>
         </div>
 
-        <div id="learn-mode-modal" class="hidden">
-            <div class="modal-content learn-mode-content">
-                <div class="learn-mode-header">
-                    <h2>Linux Distribution Family Tree</h2>
-                    <button id="close-learn-mode-btn" class="btn btn-close">×</button>
+        <div id="distrodex-modal" class="hidden">
+            <div class="modal-content distrodex-content">
+                <div class="distrodex-header">
+                    <h2>Distrodex — Linux Distribution Family Tree</h2>
+                    <button id="close-distrodex-btn" class="btn btn-close">×</button>
                 </div>
 
-                <div class="learn-mode-filters">
-                    <input type="text" id="learn-search" placeholder="Search distros..." autocomplete="off">
+                <div class="distrodex-filters">
+                    <input type="text" id="distrodex-search" placeholder="Search distros..." autocomplete="off">
 
-                    <select id="learn-category-filter">
+                    <select id="distrodex-category-filter">
                         <option value="all">All Categories</option>
                         <option value="Desktop">Desktop</option>
                         <option value="Server">Server</option>
@@ -147,25 +161,25 @@
                         <option value="Enterprise">Enterprise</option>
                     </select>
 
-                    <label class="learn-filter-checkbox">
-                        <input type="checkbox" id="learn-paid-only">
+                    <label class="distrodex-filter-checkbox">
+                        <input type="checkbox" id="distrodex-paid-only">
                         Paid Only
                     </label>
 
-                    <label class="learn-filter-checkbox">
-                        <input type="checkbox" id="learn-active-only" checked>
+                    <label class="distrodex-filter-checkbox">
+                        <input type="checkbox" id="distrodex-active-only" checked>
                         Active Only
                     </label>
 
-                    <div class="learn-expand-controls">
-                        <button id="learn-expand-all" class="btn btn-small">Expand All</button>
-                        <button id="learn-collapse-all" class="btn btn-small">Collapse All</button>
+                    <div class="distrodex-expand-controls">
+                        <button id="distrodex-expand-all" class="btn btn-small">Expand All</button>
+                        <button id="distrodex-collapse-all" class="btn btn-small">Collapse All</button>
                     </div>
                 </div>
 
-                <div id="learn-tree-container" class="learn-tree-container"></div>
+                <div id="distrodex-tree-container" class="distrodex-tree-container"></div>
 
-                <div class="learn-legend">
+                <div class="distrodex-legend">
                     <div class="legend-section">
                         <h3>Symbols</h3>
                         <div class="legend-grid">
