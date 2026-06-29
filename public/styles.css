@@ -498,10 +498,12 @@ header p {
 }
 
 .feedback-cell-animated {
-    animation: slideInLeft 0.3s ease-out forwards;
+    animation: slideInLeft 0.3s ease-out both;
     animation-delay: calc(var(--cell-index) * 0.05s);
-    opacity: 0;
-    transform: translateX(-20px);
+    /* Initial hidden state lives in the @keyframes `from` block (with
+       fill-mode: both) so a cell whose animation gets replaced — e.g. by
+       `nearMissCellGlow` on near-miss rows — falls back to its default
+       opacity/transform and stays visible. */
 }
 
 @keyframes slideInLeft {
